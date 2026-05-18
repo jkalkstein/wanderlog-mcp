@@ -76,21 +76,31 @@ upstream `types.ts` maps all but `rentalCar` — see below.
 - Others (see `src/transport/rest.ts`): `/api/user`, `/api/tripPlans/home`,
   `/api/tripPlans/{key}`, `/api/geo/autocomplete/{q}`, create/delete trip.
 
-## Known gap — place photo thumbnails (`imageKeys`)
+## Place photo thumbnails (`imageKeys`) — SOLVED
 
 Wanderlog renders the small place thumbnail from a block field
 **`imageKeys`** — an array of Wanderlog-hosted image IDs (opaque 32-char
-strings). UI-added places have 7-8; the raw Google `place.photo_urls` are
-present on every block but the UI does NOT render from them.
+strings). UI-added places have them; the raw Google `place.photo_urls` are
+present too but the UI does NOT render from those. Blocks inserted via raw
+ShareDB ops (and via the upstream MCP — `buildPlaceBlock` never sets
+`imageKeys`) have no `imageKeys`, hence no thumbnail.
 
-Blocks inserted via raw ShareDB ops (and via the upstream MCP —
-`buildPlaceBlock` never sets `imageKeys`) have **no `imageKeys`**, so no
-thumbnail. Wanderlog populates `imageKeys` server-side when a place is added
-through the UI, via an image-ingestion step that the raw op skips.
+**The image-ingestion endpoint** (reverse-engineered from the UI's
+add-place network trace, 2026-05-18):
 
-**TODO (this fork):** find Wanderlog's image-ingestion endpoint (the call
-the UI makes that turns Google photo references into Wanderlog `imageKeys`),
-and have place-add populate `imageKeys`.
+```
+POST https://wanderlog.com/api/placePhotos/{placeId}
+body: {"place": <PlaceData object>}   # the place from getPlaceDetails
+→ {"success": true, "data": ["<imageKey>", ...]}
+```
+
+It ingests the Google photos server-side and returns the `imageKeys`.
+Cookie-authed; works headlessly (verified — no browser needed).
+
+**Fix for place-add:** after `getPlaceDetails`, `POST /api/placePhotos/
+{placeId}` with `{"place": placeData}`, take the returned `data` array, and
+set `block["imageKeys"] = data` on the place block before the ShareDB `li`
+op. The thumbnail then renders like a native UI add.
 
 ## Verified working (driven directly via ShareDB ops, May 2026)
 
@@ -104,5 +114,6 @@ place to an un-dated list · create a section · rename / title a section.
 1. Map the `rentalCar` block in `types.ts`; add `add-car` tool.
 2. Add `add-flight` tool (`FlightBlock` is already typed; no creator tool).
 3. Surface `edit-note` / `remove-note` in the published build.
-4. Solve the `imageKeys` photo-ingestion gap (above).
+4. Wire `POST /api/placePhotos/{placeId}` into place-add so blocks get
+   `imageKeys` and render thumbnails (endpoint solved — see above).
 5. Per-city section helpers (`add-activity` with target section/day).
