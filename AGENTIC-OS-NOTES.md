@@ -102,18 +102,54 @@ Cookie-authed; works headlessly (verified — no browser needed).
 set `block["imageKeys"] = data` on the place block before the ShareDB `li`
 op. The thumbnail then renders like a native UI add.
 
+**Processing delay (not a failure):** `placePhotos` returns the imageKeys
+immediately, but Wanderlog downloads/processes the actual Google photos
+server-side over the next ~minute. The card is briefly blank, then the
+thumbnail appears. Verified 2026-05-18: Lou Malnati's added headlessly via
+this flow rendered a real photo within ~a minute.
+
+## Budget
+
+`itinerary.budget = {amount, expenses[], payments[], simplifyDebt}`. Each
+expense: `{id, category, amount:{amount,currencyCode}, description, date,
+blockId, paidByUserId, paidByUser:{type:"registered",id},
+splitWith:{type:"individuals",users:[]}, associatedDate}`. Categories:
+`flights, lodging, carRental, food, drinks, groceries, publicTransit, gas,
+sightseeing, activities, shopping, other`. Insert at
+`["itinerary","budget","expenses",<len>]`.
+
+**The expense editor has no `note` field — only Description.** Any
+points/certificate detail must go into `description`. Every expense needs a
+real `blockId`; the UI crashes on unlinked expenses.
+
 ## Verified working (driven directly via ShareDB ops, May 2026)
 
 create trip-typed `rentalCar` entry · delete a block (`ld`) · delete a note
 · add/edit a note (rich-text op) · add a points note to a hotel · place
 search (REST autocomplete + details) · add a place to a dated day · add a
-place to an un-dated list · create a section · rename / title a section.
+place to an un-dated list · create a section · rename / title a section ·
+**reorder sections (`lm` move ops)** · **set day-section headings
+(`od/oi`)** · **copy booked flight/hotel/rentalCar blocks between trips** ·
+**replace a reservation block's note `text`** · **add budget expenses
+linked by `blockId`** · **batch place-build with `placePhotos` thumbnails**.
+
+## Companion skill
+
+The full Obsidian-research → Wanderlog-trip pipeline, a reusable Python
+build library, and Jon's trip-format conventions are captured in the
+agent-commons skill **`wanderlog-trip-builder`**
+(`~/Developer/agent-commons/skills/wanderlog-trip-builder/`). That skill's
+`scripts/wanderlog.py` is the current best client and supersedes ad-hoc
+scripts; this MCP repo remains the place for the typed tool surface.
 
 ## Fork roadmap
 
 1. Map the `rentalCar` block in `types.ts`; add `add-car` tool.
 2. Add `add-flight` tool (`FlightBlock` is already typed; no creator tool).
 3. Surface `edit-note` / `remove-note` in the published build.
-4. Wire `POST /api/placePhotos/{placeId}` into place-add so blocks get
-   `imageKeys` and render thumbnails (endpoint solved — see above).
+4. ~~Wire `POST /api/placePhotos/{placeId}` into place-add~~ — solved and in
+   use in `wanderlog-trip-builder/scripts/wanderlog.py`; still TODO to wire
+   into the MCP `add-place` tool itself.
 5. Per-city section helpers (`add-activity` with target section/day).
+6. `add-expense` already exists but omits the (UI-absent) note field — fine;
+   ensure callers put points detail in `description`.
